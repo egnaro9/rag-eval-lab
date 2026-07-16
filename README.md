@@ -17,6 +17,13 @@ The interesting part of a Retrieval-Augmented Generation system isn't the retrie
 
 No install. The demo page **pip-installs this package's actual wheel into [Pyodide](https://pyodide.org)** and runs it client-side — the same stdlib-only code that runs in CI, executing in your tab. Run the eval suite, then **try to fool the harness**: write any answer you like and watch it score the grounding word by word.
 
+**The two halves compose.** This library *produces* an `eval_run.json`; the companion [eval-dashboard](https://egnaro9.github.io/eval-dashboard/) *renders* one. Run the eval in the browser and hit **"Open this run in the dashboard →"** — the run you just generated is handed straight over (same origin, no server in the middle):
+
+```
+rag-eval-lab  ──►  eval_run.json  ──►  eval-dashboard
+ (produces)         (the contract)        (renders)
+```
+
 ---
 
 ## How it works

@@ -66,6 +66,12 @@
   tr.flagged{background:var(--red-soft)}
   .mono{font-family:var(--mono); font-size:12px}
 
+  #handoff:not(:empty){margin-top:20px; padding:16px; border:1px solid var(--teal); background:var(--teal-soft); border-radius:4px}
+  .handoff-btn{display:inline-block; font-family:var(--mono); font-size:13.5px; padding:10px 16px; border-radius:2px;
+    border:1px solid var(--teal); color:var(--teal); background:transparent; transition:background .15s}
+  @media (hover:hover){.handoff-btn:hover{background:var(--teal); color:var(--ink)}}
+  .handoff-note{color:var(--fg-dim); font-size:13px; margin-top:10px}
+
   .fool{display:grid; gap:12px; margin-top:20px}
   label.f{font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--fg-faint)}
   input[type=text],textarea{width:100%; background:var(--raised); border:1px solid var(--line); border-radius:3px; color:var(--fg);
@@ -98,10 +104,11 @@
   <section>
     <div class="label">// Part 1</div>
     <h2>Run the eval suite</h2>
-    <p class="intro">Six questions against a small corpus. Five are answered honestly by the retriever; the last one is a <strong>planted hallucination</strong>. The harness should catch exactly one.</p>
+    <p class="intro">Six questions against a small corpus. Five are answered honestly by the retriever; the last one is a <strong>planted hallucination</strong>. The harness should catch exactly one. This writes a real <code>eval_run.json</code> — the same artifact the CLI produces — and you can send it straight to the <a href="https://egnaro9.github.io/eval-dashboard/">dashboard</a> when it's done.</p>
     <button id="runEval" disabled>▶ Run the eval</button>
     <pre class="console" id="evalOut"></pre>
     <div class="cards" id="evalCards"></div>
+    <div id="handoff"></div>
     <div id="evalTable"></div>
   </section>
 

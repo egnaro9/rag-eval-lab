@@ -87,6 +87,26 @@ function renderCorpus(docs) {
       .join("");
 }
 
+// Hand the run we just produced to the companion dashboard. Both demos are
+// served from egnaro9.github.io, so they share an origin and can pass the JSON
+// through localStorage — the eval never round-trips through a server.
+const HANDOFF_KEY = "ragevallab:eval_run";
+const DASHBOARD_URL = "https://egnaro9.github.io/eval-dashboard/?from=rag-eval-lab";
+
+function offerHandoff(run) {
+  try {
+    localStorage.setItem(HANDOFF_KEY, JSON.stringify(run));
+  } catch {
+    return; // storage unavailable (private mode) — just don't offer it
+  }
+  $("handoff").innerHTML =
+    `<a class="handoff-btn" href="${DASHBOARD_URL}" target="_blank" rel="noopener">` +
+    `Open this run in the dashboard →</a>` +
+    `<div class="handoff-note">Sends the run you just generated to ` +
+    `<a href="https://github.com/egnaro9/eval-dashboard" target="_blank" rel="noopener">eval-dashboard</a>` +
+    ` — the other half of the pipeline. Same origin, so it's handed over directly.</div>`;
+}
+
 async function runEval() {
   const btn = $("runEval");
   btn.disabled = true;
@@ -95,6 +115,7 @@ async function runEval() {
   try {
     const run = JSON.parse(await py.runPythonAsync("eval_json()"));
     const m = run.metrics;
+    offerHandoff(run);
 
     $("evalOut").textContent +=
       `run: ${run.run}\n` +
