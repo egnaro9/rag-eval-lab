@@ -1,0 +1,139 @@
+{
+  "run": "rag-eval-lab",
+  "metrics": {
+    "precision@k": 0.25,
+    "recall@k": 1.0,
+    "citation_rate": 1.0,
+    "faithfulness": 0.917,
+    "flagged_cases": 1.0,
+    "n_cases": 6.0
+  },
+  "cases": [
+    {
+      "q": "Which planet is the hottest in the Solar System?",
+      "answer": "Venus is the second planet from the Sun and the hottest planet in the Solar System. Its thick carbon dioxide atmosphere traps heat in a runaway greenhouse effect.",
+      "retrieved": [
+        "venus#0",
+        "saturn#0",
+        "mars#0",
+        "mercury#0"
+      ],
+      "citations": [
+        "venus#0"
+      ],
+      "scores": {
+        "precision@k": 0.25,
+        "recall@k": 1.0,
+        "citation": 1.0,
+        "faithfulness": 1.0
+      },
+      "flagged": false,
+      "note": ""
+    },
+    {
+      "q": "What is the tallest volcano in the Solar System?",
+      "answer": "Mars is the fourth planet from the Sun and is called the Red Planet because of iron oxide. It hosts Olympus Mons, the tallest volcano in the Solar System.",
+      "retrieved": [
+        "mars#0",
+        "saturn#0",
+        "venus#0",
+        "mercury#0"
+      ],
+      "citations": [
+        "mars#0"
+      ],
+      "scores": {
+        "precision@k": 0.25,
+        "recall@k": 1.0,
+        "citation": 1.0,
+        "faithfulness": 1.0
+      },
+      "flagged": false,
+      "note": ""
+    },
+    {
+      "q": "Which planet is famous for its ring system?",
+      "answer": "Saturn is the sixth planet from the Sun and is famous for its ring system of ice and rock. It is the second largest planet in the Solar System.",
+      "retrieved": [
+        "saturn#0",
+        "jupiter#0",
+        "venus#0",
+        "earth#0"
+      ],
+      "citations": [
+        "saturn#0"
+      ],
+      "scores": {
+        "precision@k": 0.25,
+        "recall@k": 1.0,
+        "citation": 1.0,
+        "faithfulness": 1.0
+      },
+      "flagged": false,
+      "note": ""
+    },
+    {
+      "q": "What is the largest planet?",
+      "answer": "Saturn is the sixth planet from the Sun and is famous for its ring system of ice and rock. It is the second largest planet in the Solar System.",
+      "retrieved": [
+        "saturn#0",
+        "jupiter#0",
+        "mars#0",
+        "venus#0"
+      ],
+      "citations": [
+        "saturn#0"
+      ],
+      "scores": {
+        "precision@k": 0.25,
+        "recall@k": 1.0,
+        "citation": 1.0,
+        "faithfulness": 1.0
+      },
+      "flagged": false,
+      "note": ""
+    },
+    {
+      "q": "Which planet is closest to the Sun?",
+      "answer": "Mercury is the smallest planet in the Solar System and the closest to the Sun. It has almost no atmosphere and a heavily cratered surface.",
+      "retrieved": [
+        "mercury#0",
+        "earth#0",
+        "saturn#0",
+        "mars#0"
+      ],
+      "citations": [
+        "mercury#0"
+      ],
+      "scores": {
+        "precision@k": 0.25,
+        "recall@k": 1.0,
+        "citation": 1.0,
+        "faithfulness": 1.0
+      },
+      "flagged": false,
+      "note": ""
+    },
+    {
+      "q": "Which planet is the hottest in the Solar System?",
+      "answer": "Neptune is the hottest planet because of its volcanic geysers.",
+      "retrieved": [
+        "venus#0",
+        "saturn#0",
+        "mars#0",
+        "mercury#0"
+      ],
+      "citations": [
+        "venus#0"
+      ],
+      "scores": {
+        "precision@k": 0.25,
+        "recall@k": 1.0,
+        "citation": 1.0,
+        "faithfulness": 0.5
+      },
+      "flagged": true,
+      "note": "PLANTED hallucination \u2014 answer is not supported by the retrieved context."
+    }
+  ]
+}

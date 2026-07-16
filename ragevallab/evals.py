@@ -1,0 +1,149 @@
+"""A deterministic RAG evaluation harness.
+
+No LLM-as-judge here — every metric is a closed-form function of the
+retrieved chunk ids and the answer text, so results are reproducible and CI
+never flakes. That is the whole idea behind the differential-oracle style of
+testing: make the check something a machine can run the same way every time.
+
+Metrics
+-------
+- ``precision_at_k`` / ``recall_at_k`` : retrieval quality vs. gold chunk ids.
+- ``citation_present``                 : did the answer cite at least one source?
+- ``faithfulness``                     : fraction of the answer's content tokens
+                                         that are actually supported by the
+                                         retrieved context (lexical grounding).
+                                         A hallucinated answer scores low.
+"""
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+from typing import Callable, Dict, List, Sequence
+
+from .embedder import tokenize
+
+# Small, common-word stoplist so faithfulness measures *content* overlap.
+_STOP = {
+    "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be",
+    "to", "of", "in", "on", "for", "with", "as", "by", "at", "it", "its",
+    "this", "that", "these", "those", "from", "into", "than", "then", "so",
+    "you", "your", "i", "we", "they", "he", "she", "them", "can", "will",
+}
+
+FAITHFULNESS_THRESHOLD = 0.6
+
+
+def _content_tokens(text: str) -> List[str]:
+    return [t for t in tokenize(text) if t not in _STOP]
+
+
+def precision_at_k(retrieved_ids: Sequence[str], gold_ids: Sequence[str], k: int) -> float:
+    top = retrieved_ids[:k]
+    if not top:
+        return 0.0
+    hits = sum(1 for i in top if i in set(gold_ids))
+    return hits / len(top)
+
+
+def recall_at_k(retrieved_ids: Sequence[str], gold_ids: Sequence[str], k: int) -> float:
+    gold = set(gold_ids)
+    if not gold:
+        return 1.0
+    top = set(retrieved_ids[:k])
+    return len(top & gold) / len(gold)
+
+
+def citation_present(citations: Sequence[str]) -> float:
+    return 1.0 if citations else 0.0
+
+
+def faithfulness(answer_text: str, contexts: Sequence[str]) -> float:
+    """Fraction of the answer's *content* tokens grounded in the context.
+
+    1.0 = every content word appears in a retrieved chunk. A fabricated answer
+    that mentions entities absent from the context scores well below 1.0.
+    """
+    ans_tokens = _content_tokens(answer_text)
+    if not ans_tokens:
+        return 0.0
+    supported = set()
+    for c in contexts:
+        supported |= set(_content_tokens(c))
+    grounded = sum(1 for t in ans_tokens if t in supported)
+    return grounded / len(ans_tokens)
+
+
+@dataclass
+class CaseResult:
+    q: str
+    answer: str
+    retrieved: List[str]
+    citations: List[str]
+    scores: Dict[str, float]
+    flagged: bool
+    note: str = ""
+
+
+@dataclass
+class EvalRun:
+    run: str
+    metrics: Dict[str, float]
+    cases: List[CaseResult] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        return d
+
+
+def evaluate(
+    dataset: List[dict],
+    answer_fn: Callable[[str], object],
+    k: int = 4,
+    run_name: str = "rag-eval-lab",
+    faithfulness_threshold: float = FAITHFULNESS_THRESHOLD,
+) -> EvalRun:
+    """Run ``answer_fn`` over each ``{"q", "gold_ids"}`` case and score it.
+
+    ``answer_fn(q)`` must return an object with ``.text``, ``.citations``,
+    ``.retrieved`` (chunk ids) and ``.contexts`` (chunk texts) — i.e. a
+    ``ragevallab.pipeline.Answer``.
+    """
+    cases: List[CaseResult] = []
+    for item in dataset:
+        q = item["q"]
+        gold = item.get("gold_ids", [])
+        ans = answer_fn(q)
+        p = precision_at_k(ans.retrieved, gold, k)  # type: ignore[attr-defined]
+        r = recall_at_k(ans.retrieved, gold, k)  # type: ignore[attr-defined]
+        cite = citation_present(ans.citations)  # type: ignore[attr-defined]
+        faith = faithfulness(ans.text, ans.contexts)  # type: ignore[attr-defined]
+        flagged = faith < faithfulness_threshold
+        cases.append(
+            CaseResult(
+                q=q,
+                answer=ans.text,  # type: ignore[attr-defined]
+                retrieved=list(ans.retrieved),  # type: ignore[attr-defined]
+                citations=list(ans.citations),  # type: ignore[attr-defined]
+                scores={
+                    "precision@k": round(p, 3),
+                    "recall@k": round(r, 3),
+                    "citation": cite,
+                    "faithfulness": round(faith, 3),
+                },
+                flagged=flagged,
+                note=item.get("note", ""),
+            )
+        )
+
+    def _mean(key: str) -> float:
+        vals = [c.scores[key] for c in cases]
+        return round(sum(vals) / len(vals), 3) if vals else 0.0
+
+    metrics = {
+        "precision@k": _mean("precision@k"),
+        "recall@k": _mean("recall@k"),
+        "citation_rate": _mean("citation"),
+        "faithfulness": _mean("faithfulness"),
+        "flagged_cases": float(sum(1 for c in cases if c.flagged)),
+        "n_cases": float(len(cases)),
+    }
+    return EvalRun(run=run_name, metrics=metrics, cases=cases)

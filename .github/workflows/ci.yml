@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install (stdlib-only core + pytest)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest -q
+      - name: Run the eval CLI (smoke) and prove the hallucination is flagged
+        run: |
+          python -m ragevallab.cli eval --out eval_run.json
+          python - <<'PY'
+          import json, sys
+          run = json.load(open("eval_run.json"))
+          flagged = [c for c in run["cases"] if c["flagged"]]
+          assert len(flagged) == 1, f"expected 1 flagged case, got {len(flagged)}"
+          assert "PLANTED" in flagged[0]["note"]
+          print("OK: eval harness flagged the planted hallucination")
+          PY

@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+.env
+# The CLI writes eval_run.json at run time; the committed sample is
+# eval_run.example.json.
+eval_run.json
+.DS_Store

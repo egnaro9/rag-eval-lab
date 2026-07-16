@@ -1,0 +1,7 @@
+# The lab core has ZERO runtime dependencies — it is stdlib-only on purpose,
+# so `python -m ragevallab.cli eval` runs anywhere with no install step.
+#
+# Only the test tooling and the optional "real" backends need packages:
+pytest>=7            # test runner (dev)
+# openai>=1.0        # optional: generative answers + dense embeddings (needs OPENAI_API_KEY)
+# psycopg[binary]>=3.1  # optional: PgVectorStore against Postgres + pgvector

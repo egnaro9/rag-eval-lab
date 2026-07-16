@@ -1,0 +1,33 @@
+# Optional: run the "real" vector-DB backend locally.
+#
+#   docker compose up -d db
+#   pip install -e ".[pgvector]"
+#   export DATABASE_URL=postgresql://rag:rag@localhost:5432/rag
+#   python - <<'PY'
+#   from ragevallab.store import PgVectorStore   # exercises pgvector
+#   ...
+#   PY
+#
+# The default CI path never touches this — it uses the in-memory store.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  eval:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rag:rag@db:5432/rag
