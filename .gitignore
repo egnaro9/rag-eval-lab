@@ -14,3 +14,6 @@ env/
 # eval_run.example.json.
 eval_run.json
 .DS_Store
+demo/*.whl
+demo/wheel.js
+site/

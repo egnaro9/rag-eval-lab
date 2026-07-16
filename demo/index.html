@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="rag-eval-lab running live in your browser — a real RAG eval harness that catches hallucinations. Try to fool it.">
+<title>rag-eval-lab — running in your browser</title>
+<style>
+  :root {
+    --ink:#0e1316; --panel:#141c21; --raised:#1b252b;
+    --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.05);
+    --fg:#dae2e4; --fg-dim:#8a989e; --fg-faint:#5e6c72;
+    --amber:#f2a53c; --amber-ink:#f2a53c; --amber-soft:rgba(242,165,60,.13); --amber-line:rgba(242,165,60,.34);
+    --teal:#48c1ac; --teal-soft:rgba(72,193,172,.12);
+    --red:#f87171; --red-soft:rgba(248,113,113,.12);
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ink); color:var(--fg); font-family:var(--sans);
+    font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    background-image:linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
+    background-size:34px 34px; padding:0 20px 80px;
+  }
+  .col{max-width:880px; margin:0 auto}
+  a{color:var(--amber-ink); text-decoration:none}
+  code{font-family:var(--mono); color:var(--amber-ink)}
+
+  header{padding:56px 0 28px; border-bottom:1px solid var(--line)}
+  .eye{font-family:var(--mono); font-size:12px; letter-spacing:.28em; text-transform:uppercase; color:var(--amber-ink); display:flex; align-items:center; gap:10px}
+  .eye::before{content:""; width:26px; height:1px; background:var(--amber-line)}
+  h1{font-family:var(--mono); font-weight:600; font-size:clamp(30px,6vw,48px); line-height:1.05; letter-spacing:-.02em; margin:16px 0 0}
+  .lede{color:var(--fg-dim); max-width:62ch; margin:16px 0 0}
+  .lede b{color:var(--fg)}
+
+  .status{display:flex; align-items:center; gap:10px; margin-top:22px; font-family:var(--mono); font-size:13px; color:var(--fg-dim);
+    border:1px solid var(--line); background:var(--panel); padding:10px 14px; border-radius:3px}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--amber-ink); animation:pulse 1.4s ease-in-out infinite; flex:none}
+  .status.ready .dot{background:var(--teal); animation:none}
+  .status.err .dot{background:var(--red); animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  section{padding:38px 0; border-bottom:1px solid var(--line)}
+  .label{font-family:var(--mono); font-size:11.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--amber-ink)}
+  h2{font-family:var(--mono); font-weight:600; font-size:clamp(19px,3vw,24px); margin:.5rem 0 0}
+  p.intro{color:var(--fg-dim); max-width:64ch}
+
+  button{font-family:var(--mono); font-size:13.5px; padding:11px 18px; border-radius:2px; cursor:pointer;
+    border:1px solid var(--amber-line); color:var(--amber-ink); background:var(--amber-soft); transition:background .15s}
+  button:hover:not(:disabled){background:var(--amber-ink); color:var(--ink)}
+  button:disabled{opacity:.45; cursor:not-allowed}
+
+  pre.console{font-family:var(--mono); font-size:12.5px; line-height:1.55; background:#0a0e11; border:1px solid var(--line);
+    border-radius:3px; padding:16px; overflow-x:auto; color:var(--fg-dim); margin-top:18px; max-height:340px; overflow-y:auto; white-space:pre-wrap}
+  pre.console:empty{display:none}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px; margin-top:18px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:14px}
+  .card .k{font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--fg-faint)}
+  .card .v{font-size:1.5rem; font-weight:650; margin-top:4px; font-family:var(--mono)}
+  .good{color:var(--teal)} .warn{color:var(--amber-ink)} .bad{color:var(--red)}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px; margin-top:18px}
+  th,td{text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{color:var(--fg-faint); font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.06em}
+  tr.flagged{background:var(--red-soft)}
+  .mono{font-family:var(--mono); font-size:12px}
+
+  .fool{display:grid; gap:12px; margin-top:20px}
+  label.f{font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--fg-faint)}
+  input[type=text],textarea{width:100%; background:var(--raised); border:1px solid var(--line); border-radius:3px; color:var(--fg);
+    font-family:var(--sans); font-size:14.5px; padding:11px 12px; resize:vertical}
+  input[type=text]:focus,textarea:focus{outline:none; border-color:var(--amber-line)}
+  .verdict{margin-top:16px; border:1px solid var(--line); border-radius:4px; padding:16px; background:var(--panel)}
+  .verdict.ok{border-color:var(--teal); background:var(--teal-soft)}
+  .verdict.bad{border-color:var(--red); background:var(--red-soft)}
+  .verdict h3{margin:0 0 6px; font-family:var(--mono); font-size:15px}
+  .tok{font-family:var(--mono); font-size:12.5px; padding:2px 6px; border-radius:2px; margin:2px; display:inline-block}
+  .tok.g{background:var(--teal-soft); color:var(--teal)}
+  .tok.u{background:var(--red-soft); color:var(--red); text-decoration:line-through}
+  .docs{font-family:var(--mono); font-size:12px; color:var(--fg-faint); background:#0a0e11; border:1px solid var(--line);
+    border-radius:3px; padding:14px; margin-top:14px; max-height:170px; overflow-y:auto}
+  .docs b{color:var(--amber-ink)}
+  footer{padding:34px 0 0; color:var(--fg-faint); font-size:13.5px}
+  .hint{color:var(--fg-faint); font-size:13px; font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="col">
+
+  <header>
+    <div class="eye">Live in your browser</div>
+    <h1>rag-eval-lab</h1>
+    <p class="lede">This page <b>pip-installs the real package and runs it in your browser</b> — no server, no API key, nothing mocked. The same Python that runs in CI is executing here, in WebAssembly, on your machine.</p>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Booting Python…</span></div>
+  </header>
+
+  <section>
+    <div class="label">// Part 1</div>
+    <h2>Run the eval suite</h2>
+    <p class="intro">Six questions against a small corpus. Five are answered honestly by the retriever; the last one is a <strong>planted hallucination</strong>. The harness should catch exactly one.</p>
+    <button id="runEval" disabled>▶ Run the eval</button>
+    <pre class="console" id="evalOut"></pre>
+    <div class="cards" id="evalCards"></div>
+    <div id="evalTable"></div>
+  </section>
+
+  <section>
+    <div class="label">// Part 2</div>
+    <h2>Try to fool it</h2>
+    <p class="intro">This is the part worth playing with. Write <em>any</em> answer you like and score it. Faithfulness measures what fraction of your answer's content words are actually grounded in the retrieved context — so a confident, fluent, <strong>false</strong> answer scores low and gets flagged. Make something up and watch it get caught.</p>
+
+    <div class="docs" id="corpus">Loading corpus…</div>
+    <div class="fool">
+      <div>
+        <label class="f" for="q">Question</label>
+        <input type="text" id="q" value="Which planet is the hottest in the Solar System?">
+      </div>
+      <div>
+        <label class="f" for="a">Your answer <span class="hint">— try replacing it with something false</span></label>
+        <textarea id="a" rows="3">Venus is the hottest planet because its thick carbon dioxide atmosphere traps heat.</textarea>
+      </div>
+      <div>
+        <button id="score" disabled>Score it</button>
+        <button id="fool" disabled style="border-color:var(--line);color:var(--fg-dim);background:transparent">Give me a hallucination</button>
+      </div>
+    </div>
+    <div id="verdict"></div>
+  </section>
+
+  <footer>
+    <p>Running <a href="https://github.com/egnaro9/rag-eval-lab">rag-eval-lab</a> via <a href="https://pyodide.org">Pyodide</a>. The wheel loaded above is built from <code>main</code> by CI — it's the actual package, not a port. The library is stdlib-only, which is exactly why it runs here unmodified.</p>
+    <p>Built by <a href="https://egnaro9.github.io">Erik Hill</a> · See also the <a href="https://egnaro9.github.io/eval-dashboard/">eval dashboard</a>.</p>
+  </footer>
+
+</div>
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script>
+<!-- Written by the deploy workflow; names the wheel it just built. -->
+<script src="./wheel.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

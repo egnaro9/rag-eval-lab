@@ -2,6 +2,7 @@
 
 [![ci](https://github.com/egnaro9/rag-eval-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/egnaro9/rag-eval-lab/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
+[![live demo](https://img.shields.io/badge/demo-run%20it%20in%20your%20browser-f2a53c)](https://egnaro9.github.io/rag-eval-lab/)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **A dependency-free RAG pipeline with a deterministic evaluation harness that catches hallucinations — and proves it in CI.**
@@ -11,6 +12,10 @@ The interesting part of a Retrieval-Augmented Generation system isn't the retrie
 - **Zero runtime dependencies.** The core is stdlib-only pure Python — `python -m ragevallab.cli eval` runs anywhere, no install, no API key, no model download.
 - **Deterministic evals.** TF-IDF vectors + lexical faithfulness → reproducible numbers, so the eval is a *test*, not a vibe check.
 - **Swappable "real" backends.** Drop in OpenAI embeddings/answers (`OPENAI_API_KEY`) or a Postgres + **pgvector** store — same pipeline, one env var.
+
+### ▶ [Run it in your browser](https://egnaro9.github.io/rag-eval-lab/)
+
+No install. The demo page **pip-installs this package's actual wheel into [Pyodide](https://pyodide.org)** and runs it client-side — the same stdlib-only code that runs in CI, executing in your tab. Run the eval suite, then **try to fool the harness**: write any answer you like and watch it score the grounding word by word.
 
 ---
 
