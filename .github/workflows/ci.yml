@@ -45,7 +45,12 @@ jobs:
   record:
     name: record the run in eval-history
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # main only: fork PRs have no secrets, and a PR run would record a score
+    # for code that never landed. workflow_dispatch is allowed so a run can be
+    # re-recorded without inventing a commit to hang it on.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
