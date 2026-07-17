@@ -36,6 +36,25 @@ jobs:
           print("OK: eval harness flagged the planted hallucination")
           PY
 
+  # A Dockerfile nobody builds is a promise, not an artifact. This repo shipped
+  # one for months with nothing checking it, which is the exact shape of problem
+  # the rest of the repo exists to argue against — so it gets built, and the
+  # image gets run, on every push.
+  docker:
+    name: the image actually builds and runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -t rag-eval-lab:ci .
+      - name: Run the eval inside the image
+        run: |
+          docker run --rm rag-eval-lab:ci | tee /tmp/out.txt
+          grep -q "PLANTED" /tmp/out.txt || {
+            echo "::error::the image ran but didn't flag the planted hallucination"; exit 1; }
+      - name: The test suite passes inside the image too
+        run: docker run --rm rag-eval-lab:ci pytest -q
+
   # Every push to main gets its eval run stored, so the history is a record of
   # what this repo actually scored per commit rather than a demo dataset.
   #
