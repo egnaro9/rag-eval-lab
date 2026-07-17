@@ -8,6 +8,9 @@ testing: make the check something a machine can run the same way every time.
 Metrics
 -------
 - ``precision_at_k`` / ``recall_at_k`` : retrieval quality vs. gold chunk ids.
+- ``ndcg_at_k``                       : rank-aware retrieval quality — what the
+                                         published benchmarks report, so the
+                                         number can be compared to theirs.
 - ``citation_present``                 : did the answer cite at least one source?
 - ``faithfulness``                     : fraction of the answer's content tokens
                                          that are actually supported by the
@@ -16,6 +19,7 @@ Metrics
 """
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Dict, List, Sequence
 
@@ -50,6 +54,37 @@ def recall_at_k(retrieved_ids: Sequence[str], gold_ids: Sequence[str], k: int) -
         return 1.0
     top = set(retrieved_ids[:k])
     return len(top & gold) / len(gold)
+
+
+def ndcg_at_k(retrieved_ids: Sequence[str], gold_ids: Sequence[str], k: int = 10) -> float:
+    """Normalised discounted cumulative gain — rank-aware retrieval quality.
+
+    precision@k and recall@k can't tell a gold document at rank 1 from the same
+    document at rank 10; both are "a hit in the top k". nDCG can, by discounting
+    each hit by log2(rank + 1), and that difference is the whole user experience
+    of a retriever.
+
+    It's also the metric the published benchmarks report, which is the point of
+    having it: a number nobody else measures is a number nobody can check. This
+    is the standard binary-relevance formulation (BEIR's), so `ndcg@10` here
+    means what `ndcg@10` means in a paper.
+
+    IDCG uses min(len(gold), k) — the best achievable ordering given how many
+    relevant documents actually exist. A query with one gold document scores 1.0
+    for ranking it first, rather than being punished for the k-1 slots it had no
+    way to fill.
+    """
+    if k <= 0:
+        return 0.0
+    gold = set(gold_ids)
+    if not gold:
+        return 1.0     # nothing to find; consistent with recall_at_k
+
+    dcg = sum(1.0 / math.log2(rank + 2)
+              for rank, doc_id in enumerate(retrieved_ids[:k])
+              if doc_id in gold)
+    idcg = sum(1.0 / math.log2(rank + 2) for rank in range(min(len(gold), k)))
+    return dcg / idcg if idcg else 0.0
 
 
 def citation_present(citations: Sequence[str]) -> float:

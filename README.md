@@ -78,11 +78,33 @@ run: rag-eval-lab
 The last case is a **planted hallucination**: retrieval correctly returns the Venus chunk, but the answer claims *Neptune* erupts with *volcanic geysers* — words that appear nowhere in the retrieved context. Faithfulness drops to 0.5 and the harness flags it. [`tests/test_evals.py`](tests/test_evals.py) asserts this flagging holds, and [CI](.github/workflows/ci.yml) re-checks it on every push — so a regression that silently stops catching hallucinations turns the build red.
 
 ```bash
-pip install -e ".[dev]" && pytest -q        # 12 tests
+pip install -e ".[dev]" && pytest -q        # 30 tests
 docker compose up eval                       # or run it containerized
 ```
 
 The full machine-readable report is [`eval_run.example.json`](eval_run.example.json) — this is the schema the companion [eval-dashboard](https://github.com/egnaro9) renders.
+
+---
+
+## Measured against a public benchmark
+
+Six hand-written questions prove the harness bites. They prove nothing about whether the retriever is any *good* — a suite you wrote yourself can drift, without meaning to, into agreeing with you. So it also runs on **SciFact**: 5,183 scientific abstracts, 300 test claims, human relevance judgements, and published scores from people who have never heard of this repo.
+
+```bash
+python -m ragevallab.cli benchmark --data ./scifact     # ~20s, stdlib only
+```
+
+| retriever | nDCG@10 |
+| --- | --- |
+| dense models *(published)* | ~0.65 – 0.70 |
+| BM25 *(published)* | 0.665 |
+| **this repo — TF-IDF cosine, pure stdlib** | **0.581** |
+
+**It loses to BM25, and how it loses is the interesting part.** recall@10 is **0.728** — it *finds* the right abstract nearly three quarters of the time, then fails to rank it first. That gap is the diagnosis: term saturation and length normalisation are precisely what TF-IDF cosine lacks and precisely what BM25 adds, and they fix *ranking*, not *finding*. A number with a named cause beats a number that flatters.
+
+precision@10 is 0.08 because SciFact averages ~1.1 relevant documents per query — about 0.11 is the ceiling. It's reported next to nDCG rather than hidden, because it's the clearest illustration of why nDCG is the metric this task calls for.
+
+Scoring uses the same pipeline the demo uses: chunks collapse to documents by best rank, and only the **300 judged** queries are scored, not all 1,109 in the file. Both are easy to get wrong in the direction that yields a plausible number instead of an error — so both are [tested](tests/test_benchmark.py).
 
 ---
 
@@ -123,7 +145,7 @@ ragevallab/
   evals.py      precision@k · recall@k · citation · faithfulness · evaluate()
   data.py       demo corpus + eval set + the planted hallucination
   cli.py        `python -m ragevallab.cli eval`
-tests/          12 tests — pipeline behavior + the hallucination-flag guarantee
+tests/          30 tests — pipeline behavior + the hallucination-flag guarantee
 ```
 
 ---

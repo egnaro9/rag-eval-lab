@@ -71,18 +71,58 @@ def _print_summary(run: EvalRun) -> None:
             print(f"    faithfulness={c.scores['faithfulness']}  ({c.note})")
 
 
+def run_bench(data_dir: str, k: int = 10, split: str = "test", out: str | None = None) -> dict:
+    """Score the retriever on a public benchmark and print it next to the references."""
+    from .benchmark import load_beir, run_benchmark
+
+    data = load_beir(data_dir, split=split)
+    print(f"loaded {len(data.docs)} docs, {len(data.queries)} judged queries ({split})")
+
+    def tick(n: int, total: int) -> None:
+        print(f"  {n}/{total}", end="\r", flush=True)
+
+    result = run_benchmark(data, k=k, progress=tick)
+    print(" " * 24, end="\r")
+
+    print(f"\nSciFact-style benchmark — {result['n_queries']} queries over "
+          f"{result['n_docs']} docs ({result['n_chunks']} chunks)")
+    for key in (f"ndcg@{k}", f"precision@{k}", f"recall@{k}"):
+        print(f"  {key:>14}: {result[key]}")
+    # State the comparison the number exists for. A benchmark score with nothing
+    # to compare against isn't a measurement, it's a decoration.
+    print("\n  for reference, published on SciFact:")
+    print("    BM25            ndcg@10  0.665")
+    print("    dense retrievers ndcg@10 ~0.65-0.70")
+
+    if out:
+        with open(out, "w", encoding="utf-8") as fh:
+            json.dump(result, fh, indent=2)
+        print(f"\nwrote {out}")
+    return result
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ragevallab", description="RAG eval lab")
     sub = parser.add_subparsers(dest="cmd")
     ev = sub.add_parser("eval", help="run the eval suite and write a JSON report")
     ev.add_argument("--k", type=int, default=4)
     ev.add_argument("--out", default="eval_run.json")
+
+    bm = sub.add_parser("benchmark", help="score the retriever on a BEIR-format dataset")
+    bm.add_argument("--data", required=True, help="dataset dir (corpus.jsonl, queries.jsonl, qrels/)")
+    bm.add_argument("--k", type=int, default=10, help="nDCG@k (10 is what BEIR reports)")
+    bm.add_argument("--split", default="test")
+    bm.add_argument("--out", default=None, help="write metrics as JSON")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "eval":
         run = run_eval(k=args.k, out=args.out)
         _print_summary(run)
         print(f"\nwrote {args.out}")
+        return 0
+    if args.cmd == "benchmark":
+        run_bench(args.data, k=args.k, split=args.split, out=args.out)
         return 0
     parser.print_help()
     return 1
