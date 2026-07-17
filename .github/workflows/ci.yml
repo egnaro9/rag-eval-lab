@@ -35,3 +35,38 @@ jobs:
           assert "PLANTED" in flagged[0]["note"]
           print("OK: eval harness flagged the planted hallucination")
           PY
+
+  # Every push to main gets its eval run stored, so the history is a record of
+  # what this repo actually scored per commit rather than a demo dataset.
+  #
+  # Not part of `test`: recording is a side effect, and eval-history sleeping on
+  # a free tier must never turn this repo's CI red. The eval is the product; the
+  # bookkeeping is not allowed to fail the thing it books.
+  record:
+    name: record the run in eval-history
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Run the eval
+        run: python -m ragevallab.cli eval --out eval_run.json
+      - name: POST it to eval-history
+        env:
+          EVAL_HISTORY_WRITE_KEY: ${{ secrets.EVAL_HISTORY_WRITE_KEY }}
+        run: |
+          python scripts/post_run.py \
+            --url https://eval-history.onrender.com \
+            --file eval_run.json \
+            --git-sha "${GITHUB_SHA:0:7}" \
+            --label "$(git log -1 --pretty=%s)"
+      - name: What does it say changed?
+        run: |
+          curl -sS --max-time 90 \
+            "https://eval-history.onrender.com/suites/rag-eval-lab/latest-comparison" \
+            | python -m json.tool || echo "(need two runs before there's a comparison)"
