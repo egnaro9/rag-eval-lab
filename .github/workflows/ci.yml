@@ -94,3 +94,28 @@ jobs:
           curl -sS --max-time 90 \
             "https://eval-history.onrender.com/suites/rag-eval-lab/latest-comparison" \
             | python -m json.tool || echo "(need two runs before there's a comparison)"
+
+  gate:
+    name: prompt-regress — PR eval gate
+    needs: test
+    # PRs only, and pull-requests:write means same-repo PRs; fork PRs lack the
+    # secret, and the action skips cleanly when the write key is empty.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Run the eval
+        run: python -m ragevallab.cli eval --out eval_run.json
+      # Dogfood: gate this repo's own evals against its main-branch baseline.
+      - uses: egnaro9/prompt-regress@main
+        with:
+          run: eval_run.json
+          suite: rag-eval-lab
+          write-key: ${{ secrets.EVAL_HISTORY_WRITE_KEY }}
