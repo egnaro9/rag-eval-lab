@@ -11,6 +11,7 @@ The interesting part of a Retrieval-Augmented Generation system isn't the retrie
 
 - **Zero runtime dependencies.** The core is stdlib-only pure Python — `python -m ragevallab.cli eval` runs anywhere, no install, no API key, no model download.
 - **Deterministic evals.** TF-IDF vectors + lexical faithfulness → reproducible numbers, so the eval is a *test*, not a vibe check.
+- **Pluggable retrieval — `bm25`, `hybrid` (rank fusion), and a `reranker` stage**, benchmarked against each other on SciFact. The from-scratch BM25 matches the published baseline; hybrid and lexical reranking are measured and shown *not* to beat it here — with the mechanism.
 - **Swappable "real" backends.** Drop in OpenAI embeddings/answers (`OPENAI_API_KEY`) or a Postgres + **pgvector** store — same pipeline, one env var.
 
 ### ▶ [Run it in your browser](https://egnaro9.github.io/rag-eval-lab/)
@@ -78,7 +79,7 @@ run: rag-eval-lab
 The last case is a **planted hallucination**: retrieval correctly returns the Venus chunk, but the answer claims *Neptune* erupts with *volcanic geysers* — words that appear nowhere in the retrieved context. Faithfulness drops to 0.5 and the harness flags it. [`tests/test_evals.py`](tests/test_evals.py) asserts this flagging holds, and [CI](.github/workflows/ci.yml) re-checks it on every push — so a regression that silently stops catching hallucinations turns the build red.
 
 ```bash
-pip install -e ".[dev]" && pytest -q        # 30 tests
+pip install -e ".[dev]" && pytest -q        # 38 tests
 docker compose up eval                       # or run it containerized
 ```
 
@@ -91,20 +92,28 @@ The full machine-readable report is [`eval_run.example.json`](eval_run.example.j
 Six hand-written questions prove the harness bites. They prove nothing about whether the retriever is any *good* — a suite you wrote yourself can drift, without meaning to, into agreeing with you. So it also runs on **SciFact**: 5,183 scientific abstracts, 300 test claims, human relevance judgements, and published scores from people who have never heard of this repo.
 
 ```bash
-python -m ragevallab.cli benchmark --data ./scifact     # ~20s, stdlib only
+python -m ragevallab.cli benchmark --data ./scifact --strategy all     # ~90s, stdlib only
 ```
 
-| retriever | nDCG@10 |
-| --- | --- |
-| dense models *(published)* | ~0.65 – 0.70 |
-| BM25 *(published)* | 0.665 |
-| **this repo — TF-IDF cosine, pure stdlib** | **0.581** |
+| strategy | nDCG@10 | recall@10 | notes |
+| --- | --- | --- | --- |
+| `tfidf` (cosine) | 0.580 | 0.712 | finds the doc, misranks it |
+| **`bm25`** | **0.664** | **0.782** | **matches the published BM25 baseline (0.665)** |
+| `hybrid` (RRF of tfidf + bm25) | 0.630 | 0.767 | *below* bm25 — see why |
+| `hybrid+rerank` | 0.585 | 0.737 | *below* bm25 — see why |
+| *BM25, published reference* | *0.665* | | |
+| *dense models, published* | *~0.65–0.70* | | |
 
-**It loses to BM25, and how it loses is the interesting part.** recall@10 is **0.728** — it *finds* the right abstract nearly three quarters of the time, then fails to rank it first. That gap is the diagnosis: term saturation and length normalisation are precisely what TF-IDF cosine lacks and precisely what BM25 adds, and they fix *ranking*, not *finding*. A number with a named cause beats a number that flatters.
+**The headline: a from-scratch BM25 matches the published baseline (0.664 vs 0.665).** TF-IDF cosine loses because it lacks term-frequency saturation and document-length normalisation; BM25 adds exactly those and recovers the ranking. `bm25` is now the benchmark default.
 
-precision@10 is 0.08 because SciFact averages ~1.1 relevant documents per query — about 0.11 is the ceiling. It's reported next to nDCG rather than hidden, because it's the clearest illustration of why nDCG is the metric this task calls for.
+**The more useful result is that hybrid and reranking *don't* help here — and knowing that is the point.** It would be easy to stack them and quote a bigger number; instead the table reports what they actually did:
 
-Scoring uses the same pipeline the demo uses: chunks collapse to documents by best rank, and only the **300 judged** queries are scored, not all 1,109 in the file. Both are easy to get wrong in the direction that yields a plausible number instead of an error — so both are [tested](tests/test_benchmark.py).
+- **Hybrid (reciprocal rank fusion) scores *below* BM25 alone.** RRF only helps when the retrievers it fuses are comparably good; fusing strong BM25 with weaker TF-IDF drags the result toward the weaker one. Fusion isn't free.
+- **A lexical reranker scores below BM25 too.** Rescoring on query-term coverage and phrase overlap adds no signal a good *lexical* retriever doesn't already have — lifting this further needs a *semantic* cross-encoder, which is why the [`Reranker`](ragevallab/retrieval.py) interface is there but the neural one isn't (it would need a model download; everything here stays stdlib-only and deterministic).
+
+A retrieval stack that measured its own hybrid and reranker and reports "they didn't beat the baseline here, and here's the mechanism" is worth more than one that quotes the biggest number it can assemble.
+
+precision@10 sits near 0.086 because SciFact averages ~1.1 relevant documents per query — about 0.11 is the ceiling — so it's read alongside nDCG, not instead of it. Scoring uses whole-document BM25 (the unit SciFact judges) while the RAG `pipeline` strategy retrieves *chunks* (the unit answer-generation needs); only the **300 judged** queries are scored, not all 1,109. Both the chunk→doc collapse and the judged-only filter are easy to get wrong toward a plausible-but-false number, so both are [tested](tests/test_benchmark.py), as is [BM25 itself](tests/test_retrieval.py).
 
 ---
 
@@ -145,7 +154,7 @@ ragevallab/
   evals.py      precision@k · recall@k · citation · faithfulness · evaluate()
   data.py       demo corpus + eval set + the planted hallucination
   cli.py        `python -m ragevallab.cli eval`
-tests/          30 tests — pipeline behavior + the hallucination-flag guarantee
+tests/          38 tests — pipeline behavior + the hallucination-flag guarantee
 ```
 
 ---

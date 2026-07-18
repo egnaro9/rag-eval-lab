@@ -71,34 +71,42 @@ def _print_summary(run: EvalRun) -> None:
             print(f"    faithfulness={c.scores['faithfulness']}  ({c.note})")
 
 
-def run_bench(data_dir: str, k: int = 10, split: str = "test", out: str | None = None) -> dict:
-    """Score the retriever on a public benchmark and print it next to the references."""
-    from .benchmark import load_beir, run_benchmark
+def run_bench(data_dir: str, k: int = 10, split: str = "test",
+              strategy: str = "bm25", out: str | None = None) -> dict:
+    """Score retrieval strategies on a public benchmark, next to the references.
+
+    strategy="all" runs every strategy and prints the comparison table — the
+    honest way to show that BM25 matches the published baseline while fusion and
+    lexical reranking don't beat it on this lexical task.
+    """
+    from .benchmark import STRATEGIES, load_beir, run_benchmark
 
     data = load_beir(data_dir, split=split)
-    print(f"loaded {len(data.docs)} docs, {len(data.queries)} judged queries ({split})")
+    print(f"loaded {len(data.docs)} docs, {len(data.queries)} judged queries ({split})\n")
 
     def tick(n: int, total: int) -> None:
         print(f"  {n}/{total}", end="\r", flush=True)
 
-    result = run_benchmark(data, k=k, progress=tick)
-    print(" " * 24, end="\r")
+    strategies = list(STRATEGIES) if strategy == "all" else [strategy]
+    # Progress ticks only make sense for a single slow run; in table mode they'd
+    # interleave with the rows.
+    ticker = None if strategy == "all" else tick
+    results = {}
+    print(f"  {'strategy':16} {'ndcg@'+str(k):>9} {'recall@'+str(k):>10} {'prec@'+str(k):>8}")
+    print("  " + "-" * 45)
+    for s in strategies:
+        r = run_benchmark(data, k=k, strategy=s, progress=ticker)
+        print(" " * 24, end="\r")
+        print(f"  {s:16} {r[f'ndcg@{k}']:>9} {r[f'recall@{k}']:>10} {r[f'precision@{k}']:>8}", flush=True)
+        results[s] = r
 
-    print(f"\nSciFact-style benchmark — {result['n_queries']} queries over "
-          f"{result['n_docs']} docs ({result['n_chunks']} chunks)")
-    for key in (f"ndcg@{k}", f"precision@{k}", f"recall@{k}"):
-        print(f"  {key:>14}: {result[key]}")
-    # State the comparison the number exists for. A benchmark score with nothing
-    # to compare against isn't a measurement, it's a decoration.
-    print("\n  for reference, published on SciFact:")
-    print("    BM25            ndcg@10  0.665")
-    print("    dense retrievers ndcg@10 ~0.65-0.70")
+    print("\n  for reference, published on SciFact: BM25 ndcg@10 0.665, dense ~0.65-0.70")
 
     if out:
         with open(out, "w", encoding="utf-8") as fh:
-            json.dump(result, fh, indent=2)
+            json.dump(results if strategy == "all" else results[strategy], fh, indent=2)
         print(f"\nwrote {out}")
-    return result
+    return results if strategy == "all" else results[strategy]
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -112,6 +120,8 @@ def main(argv: List[str] | None = None) -> int:
     bm.add_argument("--data", required=True, help="dataset dir (corpus.jsonl, queries.jsonl, qrels/)")
     bm.add_argument("--k", type=int, default=10, help="nDCG@k (10 is what BEIR reports)")
     bm.add_argument("--split", default="test")
+    bm.add_argument("--strategy", default="bm25",
+                    help="pipeline | tfidf | bm25 | hybrid | hybrid+rerank | all")
     bm.add_argument("--out", default=None, help="write metrics as JSON")
 
     args = parser.parse_args(argv)
@@ -122,7 +132,7 @@ def main(argv: List[str] | None = None) -> int:
         print(f"\nwrote {args.out}")
         return 0
     if args.cmd == "benchmark":
-        run_bench(args.data, k=args.k, split=args.split, out=args.out)
+        run_bench(args.data, k=args.k, split=args.split, strategy=args.strategy, out=args.out)
         return 0
     parser.print_help()
     return 1
