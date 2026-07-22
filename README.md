@@ -79,11 +79,31 @@ run: rag-eval-lab
 The last case is a **planted hallucination**: retrieval correctly returns the Venus chunk, but the answer claims *Neptune* erupts with *volcanic geysers* — words that appear nowhere in the retrieved context. Faithfulness drops to 0.5 and the harness flags it. [`tests/test_evals.py`](tests/test_evals.py) asserts this flagging holds, and [CI](.github/workflows/ci.yml) re-checks it on every push — so a regression that silently stops catching hallucinations turns the build red.
 
 ```bash
-pip install -e ".[dev]" && pytest -q        # 38 tests
-docker compose up eval                       # or run it containerized
+pip install -e ".[dev]" && pytest -q        # 43 tests (+ a pgvector integration test that needs a DB)
+docker compose run --rm eval                 # or run it containerized
 ```
 
 The full machine-readable report is [`eval_run.example.json`](eval_run.example.json) — this is the schema the companion [eval-dashboard](https://github.com/egnaro9) renders.
+
+## Run it as a service
+
+The pipeline is also wrapped in a small FastAPI app ([`api.py`](ragevallab/api.py)),
+an *optional* layer behind the `api` extra so the core stays dependency-free:
+
+```bash
+pip install -e ".[api]"
+uvicorn ragevallab.api:app --port 8000       # or: docker compose up --build api
+
+curl -s localhost:8000/query -H 'content-type: application/json' \
+     -d '{"query": "Which planet is largest?", "k": 4}'      # retrieve + answer + citations
+curl -s -X POST localhost:8000/eval                          # run the eval set, get the metrics
+curl -s localhost:8000/healthz                               # liveness
+```
+
+`POST /query` returns the extractive answer with its citations and ranked chunk
+ids; `POST /eval` runs the demo eval set (plus the planted hallucination) and
+returns the same report shape `eval-history` ingests. Deploys to Render via
+[`render.yaml`](render.yaml) — a second live service alongside `eval-history`.
 
 ---
 
@@ -154,7 +174,9 @@ ragevallab/
   evals.py      precision@k · recall@k · citation · faithfulness · evaluate()
   data.py       demo corpus + eval set + the planted hallucination
   cli.py        `python -m ragevallab.cli eval`
-tests/          38 tests — pipeline behavior + the hallucination-flag guarantee
+  api.py        optional FastAPI service (POST /query, /eval; GET /healthz)
+tests/          43 tests — pipeline behavior, the hallucination-flag guarantee,
+                the HTTP service, and a pgvector integration test (DB-gated)
 ```
 
 ---

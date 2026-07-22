@@ -1,12 +1,14 @@
-# Minimal image — the lab core is stdlib-only, so no pip install is required
-# to run the eval. The default command runs the suite and prints the report.
+# The lab core is stdlib-only; this image adds the optional HTTP service (api)
+# and the dev extra (pytest) so `docker run ... pytest` works too.
 FROM python:3.12-slim
 
 WORKDIR /app
 COPY . /app
 
-# Install only the dev extra (pytest) so `docker run ... pytest` works too.
-RUN python -m pip install --no-cache-dir -e ".[dev]"
+RUN python -m pip install --no-cache-dir -e ".[api,dev]"
 
-# Default: run the eval and write the report to /app/eval_run.json
+EXPOSE 8000
+# Default stays the eval (so CI's `docker run <image>` still checks the harness).
+# To serve the API instead — what compose and Render do:
+#   docker run -p 8000:8000 <image> uvicorn ragevallab.api:app --host 0.0.0.0 --port 8000
 CMD ["python", "-m", "ragevallab.cli", "eval", "--out", "/app/eval_run.json"]

@@ -72,11 +72,18 @@ class InMemoryVectorStore:
         return scored[: max(0, k)]
 
 
-class PgVectorStore:  # pragma: no cover - real path, not run in CI
+# Bump when the chunks-table shape changes. Recorded in schema_meta so an old
+# database is detectable rather than silently mismatching a new code path — the
+# zero-framework version of a migration version, exercised by the pgvector CI job.
+SCHEMA_VERSION = 1
+
+
+class PgVectorStore:
     """Postgres + pgvector backend. Requires ``psycopg`` and a live DB.
 
-    Run ``docker compose up -d`` (see docker-compose.yml) then set
-    ``DATABASE_URL=postgresql://rag:rag@localhost:5432/rag``.
+    Run ``docker compose up -d db`` (see docker-compose.yml) then set
+    ``DATABASE_URL=postgresql://rag:rag@localhost:5432/rag``. Exercised by the
+    ``pgvector`` CI job against a real pgvector-enabled Postgres.
     """
 
     def __init__(self, dsn: str, dim: int, table: str = "chunks") -> None:
@@ -92,6 +99,20 @@ class PgVectorStore:  # pragma: no cover - real path, not run in CI
                 f"  id TEXT PRIMARY KEY, text TEXT, meta JSONB,"
                 f"  embedding vector({dim}))"
             )
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value INT)"
+            )
+            cur.execute(
+                "INSERT INTO schema_meta (key, value) VALUES ('version', %s) "
+                "ON CONFLICT (key) DO NOTHING",
+                (SCHEMA_VERSION,),
+            )
+
+    def schema_version(self) -> int:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT value FROM schema_meta WHERE key = 'version'")
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
 
     def add(self, id: str, text: str, vector: Sequence[float], meta: dict | None = None) -> None:
         import json

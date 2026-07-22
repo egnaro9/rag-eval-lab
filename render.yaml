@@ -1,0 +1,20 @@
+# Deploy: Render (web). A second live service alongside eval-history.
+#
+# The service runs the dependency-free in-memory pipeline, so /query and /eval
+# need no database — nothing to provision, nothing to expire. DATABASE_URL is
+# optional and only wires up the pgvector backend; if you use it, put it on
+# Neon's free tier (permanent), not Render's (deleted after 30 days).
+#
+# Free-tier honesty, since the live link is public: the web service sleeps after
+# ~15 min idle and takes ~30s to wake.
+services:
+  - type: web
+    name: rag-eval-lab
+    runtime: python
+    plan: free
+    buildCommand: pip install -e ".[api]"
+    startCommand: uvicorn ragevallab.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false            # optional — only for the pgvector backend

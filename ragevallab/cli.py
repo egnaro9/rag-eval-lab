@@ -38,7 +38,9 @@ def _build_planted_case(pipe: RagPipeline, k: int, threshold: float) -> CaseResu
     )
 
 
-def run_eval(k: int = 4, out: str = "eval_run.json") -> EvalRun:
+def compute_eval_run(k: int = 4) -> EvalRun:
+    """Run the offline eval set plus the planted hallucination and return the
+    scored run — no file I/O, so the API service can reuse it verbatim."""
     pipe = RagPipeline().ingest(SAMPLE_DOCS)
     run = evaluate(EVAL_SET, lambda q: pipe.answer(q, k=k), k=k)
     # Append the planted hallucination and refresh the aggregate metrics.
@@ -53,6 +55,11 @@ def run_eval(k: int = 4, out: str = "eval_run.json") -> EvalRun:
     ):
         vals = [c.scores[key] for c in run.cases]
         run.metrics[mkey] = round(sum(vals) / len(vals), 3) if vals else 0.0
+    return run
+
+
+def run_eval(k: int = 4, out: str = "eval_run.json") -> EvalRun:
+    run = compute_eval_run(k)
     with open(out, "w", encoding="utf-8") as fh:
         json.dump(run.to_dict(), fh, indent=2)
     return run

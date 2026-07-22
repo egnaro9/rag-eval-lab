@@ -1,14 +1,12 @@
-# Optional: run the "real" vector-DB backend locally.
+# Run the RAG service (and, alongside it, a real pgvector Postgres).
 #
-#   docker compose up -d db
-#   pip install -e ".[pgvector]"
-#   export DATABASE_URL=postgresql://rag:rag@localhost:5432/rag
-#   python - <<'PY'
-#   from ragevallab.store import PgVectorStore   # exercises pgvector
-#   ...
-#   PY
+#   docker compose up --build api        # service on :8000  (POST /query, /eval)
+#   docker compose up -d db              # just the pgvector database, e.g. for
+#                                        # DATABASE_URL=postgresql://rag:rag@localhost:5432/rag
+#   docker compose run --rm eval         # run the offline eval once, print the report
 #
-# The default CI path never touches this — it uses the in-memory store.
+# /query and /eval use the dependency-free in-memory pipeline, so the service
+# needs no database; `db` is here for exercising the PgVectorStore path.
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -23,6 +21,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    build: .
+    command: ["sh", "-c", "uvicorn ragevallab.api:app --host 0.0.0.0 --port 8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://rag:rag@db:5432/rag
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   eval:
     build: .

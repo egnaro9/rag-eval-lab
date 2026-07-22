@@ -119,3 +119,34 @@ jobs:
           run: eval_run.json
           suite: rag-eval-lab
           write-key: ${{ secrets.EVAL_HISTORY_WRITE_KEY }}
+
+  # The pgvector backend was shipped with `# pragma: no cover` — a real path the
+  # suite never ran. This job runs it against a real pgvector-enabled Postgres,
+  # so "it works with pgvector" is demonstrated, not asserted. The default `test`
+  # job still skips it (no DATABASE_URL), so a normal run needs no database.
+  pgvector:
+    name: pgvector integration
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: rag
+          POSTGRES_PASSWORD: rag
+          POSTGRES_DB: rag
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rag"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,pgvector]"
+      - name: Exercise the real pgvector backend (store, search, schema version)
+        env:
+          DATABASE_URL: postgresql://rag:rag@localhost:5432/rag
+        run: pytest -q tests/test_pgvector.py -rs
