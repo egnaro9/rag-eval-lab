@@ -114,22 +114,34 @@ class PgVectorStore:
             row = cur.fetchone()
             return int(row[0]) if row else 0
 
+    @staticmethod
+    def _vec(values: Sequence[float]) -> str:
+        """pgvector's text input form, e.g. ``[0.9,0.1,0.0]``.
+
+        A bound Python list would arrive as a ``double precision[]``, and there
+        is no ``vector <=> double precision[]`` operator — so the literal is sent
+        as text and cast with ``::vector`` at the call site. No extra dependency
+        (the `pgvector` adapter package) is needed for this.
+        """
+        return "[" + ",".join(repr(float(v)) for v in values) + "]"
+
     def add(self, id: str, text: str, vector: Sequence[float], meta: dict | None = None) -> None:
         import json
 
         with self._conn.cursor() as cur:
             cur.execute(
                 f"INSERT INTO {self.table} (id, text, meta, embedding) "
-                f"VALUES (%s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                (id, text, json.dumps(meta or {}), list(vector)),
+                f"VALUES (%s, %s, %s, %s::vector) ON CONFLICT (id) DO NOTHING",
+                (id, text, json.dumps(meta or {}), self._vec(vector)),
             )
 
     def search(self, query_vec: Sequence[float], k: int = 4):
+        vec = self._vec(query_vec)
         with self._conn.cursor() as cur:
             cur.execute(
-                f"SELECT id, text, meta, 1 - (embedding <=> %s) AS score "
-                f"FROM {self.table} ORDER BY embedding <=> %s LIMIT %s",
-                (list(query_vec), list(query_vec), k),
+                f"SELECT id, text, meta, 1 - (embedding <=> %s::vector) AS score "
+                f"FROM {self.table} ORDER BY embedding <=> %s::vector LIMIT %s",
+                (vec, vec, k),
             )
             rows = cur.fetchall()
         return [
