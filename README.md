@@ -88,21 +88,29 @@ The full machine-readable report is [`eval_run.example.json`](eval_run.example.j
 ## Run it as a service
 
 The pipeline is also wrapped in a small FastAPI app ([`api.py`](ragevallab/api.py)),
-an *optional* layer behind the `api` extra so the core stays dependency-free:
+an *optional* layer behind the `api` extra so the core stays dependency-free.
+
+**Live: https://rag-eval-lab.onrender.com** (Render free tier — ~30s to wake if idle):
+
+```bash
+BASE=https://rag-eval-lab.onrender.com        # or localhost:8000 (see below)
+
+curl -s "$BASE/query" -H 'content-type: application/json' \
+     -d '{"query": "Which planet is largest?", "k": 4}'      # retrieve + answer + citations
+curl -s -X POST "$BASE/eval"                                 # run the eval set, get the metrics
+curl -s "$BASE/healthz"                                      # liveness
+```
+
+Run it yourself:
 
 ```bash
 pip install -e ".[api]"
-uvicorn ragevallab.api:app --port 8000       # or: docker compose up --build api
-
-curl -s localhost:8000/query -H 'content-type: application/json' \
-     -d '{"query": "Which planet is largest?", "k": 4}'      # retrieve + answer + citations
-curl -s -X POST localhost:8000/eval                          # run the eval set, get the metrics
-curl -s localhost:8000/healthz                               # liveness
+uvicorn ragevallab.api:app --port 8000        # or: docker compose up --build api
 ```
 
 `POST /query` returns the extractive answer with its citations and ranked chunk
 ids; `POST /eval` runs the demo eval set (plus the planted hallucination) and
-returns the same report shape `eval-history` ingests. Deploys to Render via
+returns the same report shape `eval-history` ingests. Deployed on Render via
 [`render.yaml`](render.yaml) — a second live service alongside `eval-history`.
 
 ---

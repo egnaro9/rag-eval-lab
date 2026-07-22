@@ -36,6 +36,12 @@ def test_query_rejects_out_of_range_k():
     assert r.status_code == 422                # k <= 20
 
 
+def test_eval_works_with_no_body():
+    r = _client().post("/eval")                   # a bare POST uses the default k
+    assert r.status_code == 200
+    assert r.json()["metrics"]["n_cases"] >= 1
+
+
 def test_eval_runs_the_suite_and_flags_the_planted_case():
     r = _client().post("/eval", json={"k": 4})
     assert r.status_code == 200

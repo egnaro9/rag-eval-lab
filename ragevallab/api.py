@@ -58,10 +58,11 @@ def create_app() -> FastAPI:
         return asdict(pipe.answer(body.query, k=body.k))
 
     @app.post("/eval", tags=["rag"])
-    def run_eval(body: EvalIn) -> dict:
+    def run_eval(body: EvalIn | None = None) -> dict:
         """Run the eval set (+ the planted hallucination) and return the run,
-        the same shape eval-history ingests and eval-dashboard renders."""
-        return compute_eval_run(body.k).to_dict()
+        the same shape eval-history ingests and eval-dashboard renders. The body
+        is optional — a bare POST runs with the default k."""
+        return compute_eval_run((body or EvalIn()).k).to_dict()
 
     return app
 
