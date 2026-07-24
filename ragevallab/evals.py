@@ -23,21 +23,11 @@ import math
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Dict, List, Sequence
 
-from .embedder import tokenize
-
-# Small, common-word stoplist so faithfulness measures *content* overlap.
-_STOP = {
-    "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be",
-    "to", "of", "in", "on", "for", "with", "as", "by", "at", "it", "its",
-    "this", "that", "these", "those", "from", "into", "than", "then", "so",
-    "you", "your", "i", "we", "they", "he", "she", "them", "can", "will",
-}
-
-FAITHFULNESS_THRESHOLD = 0.6
-
-
-def _content_tokens(text: str) -> List[str]:
-    return [t for t in tokenize(text) if t not in _STOP]
+# The grounding metric now lives in the shared gradecore engine — the same
+# deterministic, no-LLM-judge core that model-drift and the crash-test platform
+# use. It was extracted verbatim (identical tokenizer, stoplist and math), so the
+# SciFact numbers below are unchanged; this repo just no longer keeps its own copy.
+from gradecore.grounding import FAITHFULNESS_THRESHOLD, grounding_score
 
 
 def precision_at_k(retrieved_ids: Sequence[str], gold_ids: Sequence[str], k: int) -> float:
@@ -92,19 +82,12 @@ def citation_present(citations: Sequence[str]) -> float:
 
 
 def faithfulness(answer_text: str, contexts: Sequence[str]) -> float:
-    """Fraction of the answer's *content* tokens grounded in the context.
+    """Fraction of the answer's content tokens grounded in the context.
 
-    1.0 = every content word appears in a retrieved chunk. A fabricated answer
-    that mentions entities absent from the context scores well below 1.0.
+    A thin alias for gradecore's shared ``grounding_score`` — kept as a local
+    name so the rest of the harness (and its tests) stay unchanged.
     """
-    ans_tokens = _content_tokens(answer_text)
-    if not ans_tokens:
-        return 0.0
-    supported = set()
-    for c in contexts:
-        supported |= set(_content_tokens(c))
-    grounded = sum(1 for t in ans_tokens if t in supported)
-    return grounded / len(ans_tokens)
+    return grounding_score(answer_text, contexts)
 
 
 @dataclass
