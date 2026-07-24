@@ -2,6 +2,12 @@
 # and the dev extra (pytest) so `docker run ... pytest` works too.
 FROM python:3.12-slim
 
+# git is needed to install the shared grounding grader from gradecore, which is a
+# git dependency (the "one engine" is shared, not vendored). slim has no git.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY . /app
 
