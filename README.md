@@ -1,11 +1,11 @@
 # rag-eval-lab
 
+**A RAG pipeline with no third-party dependencies and a deterministic evaluation harness that catches hallucinations — and proves it in CI.** A bare install pulls in exactly one package, my own [gradecore](https://github.com/egnaro9/gradecore), which has no dependencies of its own; everything else is the standard library.
+
 [![ci](https://github.com/egnaro9/rag-eval-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/egnaro9/rag-eval-lab/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
 [![live demo](https://img.shields.io/badge/demo-run%20it%20in%20your%20browser-f2a53c)](https://egnaro9.github.io/rag-eval-lab/)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-
-**A RAG pipeline with no third-party dependencies and a deterministic evaluation harness that catches hallucinations — and proves it in CI.** A bare install pulls in exactly one package, my own [gradecore](https://github.com/egnaro9/gradecore), which has no dependencies of its own; everything else is the standard library.
 
 The interesting part of a Retrieval-Augmented Generation system isn't the retrieval; it's *knowing whether the answer is grounded in what was retrieved*. This repo is a small, readable reference for that: a full ingest → chunk → embed → store → retrieve → answer pipeline, plus an eval harness whose metrics are closed-form (no LLM-as-judge), so the same input always produces the same score and **CI fails if a planted hallucination stops being flagged.**
 
