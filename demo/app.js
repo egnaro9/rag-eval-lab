@@ -25,16 +25,28 @@ async function boot() {
 
     setStatus("Installing the ragevallab wheel…");
     await py.loadPackage("micropip");
-    const micropip = py.pyimport("micropip");
-    // WHEEL_URL is written by the deploy workflow (it knows the built filename).
-    await micropip.install(window.WHEEL_URL || "./ragevallab-0.1.0-py3-none-any.whl");
+    // Both URLs are written by the deploy workflow, which knows the built
+    // filenames. gradecore goes first and ragevallab installs with deps off:
+    // the wheel declares `gradecore @ git+https://...`, and micropip tries to
+    // parse that as a wheel filename and dies. Installing the dependency
+    // ourselves means it never has to resolve the git URL.
+    py.globals.set("_RAGEVAL_WHEEL", window.WHEEL_URL || "./ragevallab-0.1.0-py3-none-any.whl");
+    py.globals.set("_GRADECORE_WHEEL", window.GRADECORE_WHEEL_URL || "./gradecore-0.1.0-py3-none-any.whl");
+    await py.runPythonAsync(`
+import micropip
+await micropip.install(_GRADECORE_WHEEL)
+await micropip.install(_RAGEVAL_WHEEL, deps=False)
+`);
 
     setStatus("Indexing the corpus…");
     await py.runPythonAsync(`
 import json
 from ragevallab.data import SAMPLE_DOCS, EVAL_SET, PLANTED
 from ragevallab.pipeline import RagPipeline
-from ragevallab.evals import faithfulness, evaluate, FAITHFULNESS_THRESHOLD, _content_tokens
+from ragevallab.evals import faithfulness, evaluate, FAITHFULNESS_THRESHOLD
+# The tokenizer moved to gradecore with the grounding metric and is public there
+# now; importing it from ragevallab.evals silently broke this page.
+from gradecore.grounding import content_tokens
 from ragevallab.cli import run_eval
 import ragevallab
 
@@ -53,8 +65,8 @@ def score_json(question, answer):
     ans = PIPE.answer(question, k=4)
     supported = set()
     for c in ans.contexts:
-        supported |= set(_content_tokens(c))
-    toks = [{"t": t, "grounded": t in supported} for t in _content_tokens(answer)]
+        supported |= set(content_tokens(c))
+    toks = [{"t": t, "grounded": t in supported} for t in content_tokens(answer)]
     f = faithfulness(answer, ans.contexts)
     return json.dumps({
         "faithfulness": round(f, 3),

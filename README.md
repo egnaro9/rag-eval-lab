@@ -9,7 +9,7 @@
 
 The interesting part of a Retrieval-Augmented Generation system isn't the retrieval; it's *knowing whether the answer is grounded in what was retrieved*. This repo is a small, readable reference for that: a full ingest → chunk → embed → store → retrieve → answer pipeline, plus an eval harness whose metrics are closed-form (no LLM-as-judge), so the same input always produces the same score and **CI fails if a planted hallucination stops being flagged.**
 
-- **Zero runtime dependencies.** The core is stdlib-only pure Python — `python -m ragevallab.cli eval` runs anywhere, no install, no API key, no model download.
+- **No third-party dependencies.** Pure-stdlib Python end to end. The one dependency is [gradecore](https://github.com/egnaro9/gradecore), the shared grading engine this repo delegates its faithfulness metric to — itself stdlib-only. No API key, no model download, no wheels to build.
 - **Deterministic evals.** TF-IDF vectors + lexical faithfulness → reproducible numbers, so the eval is a *test*, not a vibe check.
 - **Pluggable retrieval — `bm25`, `hybrid` (rank fusion), and a `reranker` stage**, benchmarked against each other on SciFact. The from-scratch BM25 matches the published baseline; hybrid and lexical reranking are measured and shown *not* to beat it here — with the mechanism.
 - **Swappable "real" backends.** Drop in OpenAI embeddings/answers (`OPENAI_API_KEY`) or a Postgres + **pgvector** store — same pipeline, one env var.
@@ -59,7 +59,8 @@ The four metrics, each a pure function of the retrieved chunk ids and the answer
 
 ```bash
 git clone https://github.com/egnaro9/rag-eval-lab && cd rag-eval-lab
-python -m ragevallab.cli eval        # no install needed — stdlib only
+pip install -e .                     # pulls gradecore; no other dependencies
+python -m ragevallab.cli eval        # stdlib-only from here on
 ```
 
 Output (abridged):
@@ -79,7 +80,7 @@ run: rag-eval-lab
 The last case is a **planted hallucination**: retrieval correctly returns the Venus chunk, but the answer claims *Neptune* erupts with *volcanic geysers* — words that appear nowhere in the retrieved context. Faithfulness drops to 0.5 and the harness flags it. [`tests/test_evals.py`](tests/test_evals.py) asserts this flagging holds, and [CI](.github/workflows/ci.yml) re-checks it on every push — so a regression that silently stops catching hallucinations turns the build red.
 
 ```bash
-pip install -e ".[dev]" && pytest -q        # 43 tests (+ a pgvector integration test that needs a DB)
+pip install -e ".[dev]" && pytest -q        # 44 tests (+ 2 pgvector integration tests that need a DB)
 docker compose run --rm eval                 # or run it containerized
 ```
 
@@ -183,7 +184,7 @@ ragevallab/
   data.py       demo corpus + eval set + the planted hallucination
   cli.py        `python -m ragevallab.cli eval`
   api.py        optional FastAPI service (POST /query, /eval; GET /healthz)
-tests/          43 tests — pipeline behavior, the hallucination-flag guarantee,
+tests/          44 tests — pipeline behavior, the hallucination-flag guarantee,
                 the HTTP service, and a pgvector integration test (DB-gated)
 ```
 

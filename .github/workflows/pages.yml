@@ -26,19 +26,36 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build the wheel
+      # gradecore is a real dependency, and micropip cannot resolve the
+      # `gradecore @ git+https://...` requirement the wheel declares — it tries
+      # to parse "gradecore" as a wheel filename and fails, which took the whole
+      # demo down. Build both wheels here and let the page install gradecore
+      # first, so the requirement is already satisfied.
+      - name: Check out gradecore
+        uses: actions/checkout@v4
+        with:
+          repository: egnaro9/gradecore
+          path: .gradecore
+
+      - name: Build both wheels
         run: |
           python -m pip install --upgrade pip build
           python -m build --wheel
+          python -m build --wheel --outdir dist .gradecore
 
       - name: Assemble the demo site
         run: |
           mkdir -p site
           cp demo/index.html demo/app.js site/
           cp dist/*.whl site/
-          WHEEL=$(cd dist && ls *.whl | head -1)
-          echo "window.WHEEL_URL = './${WHEEL}';" > site/wheel.js
-          echo "Demo will install: ${WHEEL}"
+          WHEEL=$(cd dist && ls ragevallab-*.whl | head -1)
+          GRADECORE=$(cd dist && ls gradecore-*.whl | head -1)
+          test -n "$WHEEL" -a -n "$GRADECORE"   # fail loudly rather than ship a dead page
+          {
+            echo "window.WHEEL_URL = './${WHEEL}';"
+            echo "window.GRADECORE_WHEEL_URL = './${GRADECORE}';"
+          } > site/wheel.js
+          echo "Demo will install: ${GRADECORE} then ${WHEEL}"
 
       - uses: actions/upload-pages-artifact@v3
         with:
