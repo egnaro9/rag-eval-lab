@@ -5,7 +5,7 @@
 [![live demo](https://img.shields.io/badge/demo-run%20it%20in%20your%20browser-f2a53c)](https://egnaro9.github.io/rag-eval-lab/)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**A dependency-free RAG pipeline with a deterministic evaluation harness that catches hallucinations — and proves it in CI.**
+**A RAG pipeline with no third-party dependencies and a deterministic evaluation harness that catches hallucinations — and proves it in CI.** A bare install pulls in exactly one package, my own [gradecore](https://github.com/egnaro9/gradecore), which has no dependencies of its own; everything else is the standard library.
 
 The interesting part of a Retrieval-Augmented Generation system isn't the retrieval; it's *knowing whether the answer is grounded in what was retrieved*. This repo is a small, readable reference for that: a full ingest → chunk → embed → store → retrieve → answer pipeline, plus an eval harness whose metrics are closed-form (no LLM-as-judge), so the same input always produces the same score and **CI fails if a planted hallucination stops being flagged.**
 
@@ -93,7 +93,7 @@ The full machine-readable report is [`eval_run.example.json`](eval_run.example.j
 ## Run it as a service
 
 The pipeline is also wrapped in a small FastAPI app ([`api.py`](ragevallab/api.py)),
-an *optional* layer behind the `api` extra so the core stays dependency-free.
+an *optional* layer behind the `api` extra so the core keeps its stdlib-only footprint.
 
 **Live: https://rag-eval-lab.onrender.com** (Render free tier — ~30s to wake if idle):
 
