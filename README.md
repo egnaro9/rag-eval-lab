@@ -27,6 +27,10 @@ rag-eval-lab  ──►  eval_run.json  ──►  eval-dashboard
 
 ---
 
+<img src="docs/demo.gif" alt="The eval harness catching a planted hallucination at faithfulness 0.5" width="100%">
+
+*One answer in the suite is unsupported by its own retrieved context. The grader finds it with no model in the loop — faithfulness 0.5, one case flagged: `python -m ragevallab.cli eval`. [Play it as a terminal session](https://asciinema.org/a/k0m7dOqwWt1kdSlx) — the text is selectable.*
+
 ## How it works
 
 ```mermaid
