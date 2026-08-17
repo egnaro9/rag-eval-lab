@@ -22,6 +22,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+      - name: Fetch SciFact (BEIR) so the benchmark claim is TESTED, not asserted
+        run: |
+          # The README's headline number (BM25 0.664 vs published 0.665) had no
+          # guard until 2026-08-17: no dataset in CI, no job running the
+          # benchmark. tests/test_scifact_benchmark.py hard-fails under CI if
+          # this directory is missing, so this step cannot be dropped silently.
+          curl -sL -o scifact.zip "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip"
+          unzip -o -q scifact.zip
+          rm scifact.zip
       - name: Run tests
         run: pytest -q
       - name: Run the eval CLI (smoke) and prove the hallucination is flagged
