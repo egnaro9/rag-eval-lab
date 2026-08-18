@@ -1,6 +1,6 @@
 """A thin FastAPI service over the RAG pipeline.
 
-This is an *optional* layer — the lab's core stays dependency-free, and the API
+This is an *optional* layer. The lab's core stays dependency-free, and the API
 lives behind the ``api`` extra (``pip install -e ".[api]"``), so importing the
 pipeline never drags in a web framework.
 
@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
@@ -38,7 +39,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="rag-eval-lab",
         version=__version__,
-        summary="Retrieve, answer, and evaluate — the RAG lab as a service.",
+        summary="Retrieve, answer, and evaluate: the RAG lab as a service.",
         description="A dependency-free RAG pipeline (from-scratch BM25/TF-IDF, "
                     "extractive answerer) with a deterministic eval harness that "
                     "catches a planted hallucination. This wraps it in HTTP.",
@@ -47,9 +48,18 @@ def create_app() -> FastAPI:
     # the same query always returns the same answer.
     pipe = RagPipeline().ingest(SAMPLE_DOCS)
 
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        """Send the root at the interactive docs.
+
+        Without this a visitor to "/" gets a bare 404, which is indistinguishable
+        from the service being down. It is up; it simply had no landing page.
+        """
+        return RedirectResponse(url="/docs")
+
     @app.get("/healthz", tags=["ops"])
     def healthz() -> dict:
-        """Liveness — deliberately touches nothing."""
+        """Liveness. Deliberately touches nothing."""
         return {"status": "ok", "version": __version__}
 
     @app.post("/query", tags=["rag"])
@@ -61,7 +71,7 @@ def create_app() -> FastAPI:
     def run_eval(body: EvalIn | None = None) -> dict:
         """Run the eval set (+ the planted hallucination) and return the run,
         the same shape eval-history ingests and eval-dashboard renders. The body
-        is optional — a bare POST runs with the default k."""
+        is optional; a bare POST runs with the default k."""
         return compute_eval_run((body or EvalIn()).k).to_dict()
 
     return app
