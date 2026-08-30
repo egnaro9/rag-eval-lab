@@ -18,7 +18,15 @@ classifiers = [
 ]
 # The grounding grader is shared, not vendored: it comes from gradecore, the same
 # zero-dependency, no-LLM-judge engine model-drift and the crash-test platform use.
-dependencies = ["gradecore @ git+https://github.com/egnaro9/gradecore"]
+#
+# From PyPI, and NOT `gradecore @ git+...`. A direct URL points at a default branch,
+# which is a moving ref, and pip gives a direct URL precedence over any version a
+# consumer already installed. crashkit pins gradecore==0.10.0 for VAC replay
+# determinism, installed this package two lines later, and pip silently replaced the
+# pin with whatever main happened to be. gradecore main reached 0.10.1 on 2026-08-19;
+# crashkit CI went red on 08-20 and stayed red for ten days. A library cannot know
+# what its consumers pin, so it must not express a requirement that overrides them.
+dependencies = ["gradecore>=0.10.0"]
 
 [project.optional-dependencies]
 # The lab core is stdlib-only. These extras enable the "real" backends and the
