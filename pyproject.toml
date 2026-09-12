@@ -26,7 +26,7 @@ classifiers = [
 # pin with whatever main happened to be. gradecore main reached 0.10.1 on 2026-08-19;
 # crashkit CI went red on 08-20 and stayed red for ten days. A library cannot know
 # what its consumers pin, so it must not express a requirement that overrides them.
-dependencies = ["gradecore>=0.10.0"]
+dependencies = ["gradecore==0.10.2"]
 
 [project.optional-dependencies]
 # The lab core is stdlib-only. These extras enable the "real" backends and the

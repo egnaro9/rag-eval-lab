@@ -46,10 +46,16 @@ def create_app() -> FastAPI:
     )
     # Ingest the demo corpus once; the extractive answerer is deterministic, so
     # the same query always returns the same answer.
+    #
+    # This runs at import, and that is fine in an isolate: it touches no entropy,
+    # no filesystem and no network. SAMPLE_DOCS is a Python literal. Keep it that
+    # way. A Cloudflare Worker forbids entropy during isolate startup, so adding
+    # a uuid or a random seed here would break the deploy before a single route
+    # registered, which is exactly how crashkit's port failed first time.
     pipe = RagPipeline().ingest(SAMPLE_DOCS)
 
     @app.get("/", include_in_schema=False)
-    def root() -> RedirectResponse:
+    async def root() -> RedirectResponse:
         """Send the root at the interactive docs.
 
         Without this a visitor to "/" gets a bare 404, which is indistinguishable
@@ -58,17 +64,17 @@ def create_app() -> FastAPI:
         return RedirectResponse(url="/docs")
 
     @app.get("/healthz", tags=["ops"])
-    def healthz() -> dict:
+    async def healthz() -> dict:
         """Liveness. Deliberately touches nothing."""
         return {"status": "ok", "version": __version__}
 
     @app.post("/query", tags=["rag"])
-    def query(body: QueryIn) -> dict:
+    async def query(body: QueryIn) -> dict:
         """Retrieve the top-k chunks and return the extractive answer + citations."""
         return asdict(pipe.answer(body.query, k=body.k))
 
     @app.post("/eval", tags=["rag"])
-    def run_eval(body: EvalIn | None = None) -> dict:
+    async def run_eval(body: EvalIn | None = None) -> dict:
         """Run the eval set (+ the planted hallucination) and return the run,
         the same shape eval-history ingests and eval-dashboard renders. The body
         is optional; a bare POST runs with the default k."""

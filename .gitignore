@@ -18,3 +18,11 @@ demo/*.whl
 demo/wheel.js
 site/
 scifact/
+
+# Worker bundle build output and miniflare emulator state
+worker/dist/
+worker/.venv*/
+worker/python_modules/
+worker/pylock.toml
+worker/uv.lock
+worker/.wrangler/

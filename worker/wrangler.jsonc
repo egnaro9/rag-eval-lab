@@ -1,0 +1,15 @@
+{
+  "name": "rag-eval-lab",
+  // Pinned so a deploy cannot land in the wrong Cloudflare account.
+  // This is erik.hill0987@gmail.com.
+  "account_id": "4705fd918037663060a5d81780fac669",
+  "main": "entry.py",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["python_workers"],
+  // Custom domain on the erikhill.dev zone, which lives in this same account.
+  // Cloudflare creates and manages the DNS record; do not add one by hand. It
+  // is proxied, necessarily, because the Worker runs at the edge.
+  "routes": [
+    { "pattern": "rag-eval-lab.erikhill.dev", "custom_domain": true }
+  ]
+}

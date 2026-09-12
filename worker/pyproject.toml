@@ -1,0 +1,18 @@
+[project]
+name = "rag-eval-lab-worker"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "workers-py",
+    "fastapi",
+    "gradecore==0.10.2",
+    "ragevallab",
+]
+
+[tool.uv.sources]
+# pywrangler installs binary-only (--no-build), so this is the BUILT wheel, not
+# the source tree. After any change under ragevallab/, run worker/build.sh,
+# which rebuilds AND re-locks. Rebuilding alone leaves uv.lock pinning the old
+# wheel's hash, and every `uv run` then dies on a hash mismatch that names the
+# wheel rather than the lock, so it reads like a corrupt build.
+ragevallab = { path = "dist/ragevallab-0.1.0-py3-none-any.whl" }
