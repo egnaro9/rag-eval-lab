@@ -86,23 +86,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e .
+      # eval-history's hosted API is gone: Render dropped its free tier on
+      # 2026-08-30 and this job POSTed into the void for 13 days. It is
+      # continue-on-error, so CI stayed green while the archive quietly stopped
+      # gaining rag-eval-lab rows. Writing straight to the database the archive
+      # reads takes the process out of the path entirely.
+      - run: |
+          pip install -e .
+          pip install 'evalhistory @ git+https://github.com/egnaro9/eval-history' \
+                      'psycopg[binary]>=3.1'
       - name: Run the eval
         run: python -m ragevallab.cli eval --out eval_run.json
-      - name: POST it to eval-history
+      - name: Record it in eval-history
         env:
-          EVAL_HISTORY_WRITE_KEY: ${{ secrets.EVAL_HISTORY_WRITE_KEY }}
+          # Never echoed, never an argument. post_run.py reads it from the
+          # environment, and a --database-url flag is deliberately absent: a
+          # connection string on a command line lands in the CI log.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python scripts/post_run.py \
-            --url https://eval-history.onrender.com \
+          python scripts/post_run.py --db \
             --file eval_run.json \
             --git-sha "${GITHUB_SHA:0:7}" \
             --label "$(git log -1 --pretty=%s)"
-      - name: What does it say changed?
+      - name: How many runs are published?
         run: |
-          curl -sS --max-time 90 \
-            "https://eval-history.onrender.com/suites/rag-eval-lab/latest-comparison" \
-            | python -m json.tool || echo "(need two runs before there's a comparison)"
+          curl -sS --max-time 30 "https://erikhill.dev/eval-history/runs.json" \
+            | python -c "import json,sys; rs=json.load(sys.stdin); rs=rs if isinstance(rs,list) else rs.get('runs',[]); rag=[r for r in rs if r.get('name')=='rag-eval-lab']; print(f'{len(rag)} rag-eval-lab runs published, newest', max((r.get('created_at','') for r in rag), default='none'))" \
+            || echo "(the archive refreshes daily; this run will appear in the next export)"
 
   gate:
     name: prompt-regress — PR eval gate
