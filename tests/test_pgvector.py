@@ -1,4 +1,8 @@
 """Integration test for the pgvector backend.
+# check-readme-test-count: exempt - this module is gated on a live Postgres and runs in
+# its own CI job with a pgvector service, so it contributes nothing to the count the
+# README advertises. Without this line the checker rightly objects to a test file that
+# collected nothing, because that is usually a missing extra rather than a choice.
 
 Skipped unless a Postgres with the pgvector extension is reachable via
 DATABASE_URL. The `pgvector` CI job provides one (the `pgvector/pgvector` image);
