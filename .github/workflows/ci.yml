@@ -33,6 +33,8 @@ jobs:
           rm scifact.zip
       - name: Run tests
         run: pytest -q
+      - name: README's advertised test count must match the suite
+        run: python scripts/check_readme_test_count.py
       - name: Run the eval CLI (smoke) and prove the hallucination is flagged
         run: |
           python -m ragevallab.cli eval --out eval_run.json
