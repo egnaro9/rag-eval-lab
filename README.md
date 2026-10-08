@@ -84,7 +84,7 @@ run: rag-eval-lab
 The last case is a **planted hallucination**: retrieval correctly returns the Venus chunk, but the answer claims *Neptune* erupts with *volcanic geysers* — words that appear nowhere in the retrieved context. Faithfulness drops to 0.5 and the harness flags it. [`tests/test_evals.py`](tests/test_evals.py) asserts this flagging holds, and [CI](.github/workflows/ci.yml) re-checks it on every push — so a regression that silently stops catching hallucinations turns the build red.
 
 ```bash
-pip install -e ".[dev]" && pytest -q        # 45 tests (+ 1 pgvector integration test that needs a DB)
+pip install -e ".[dev]" && pytest -q        # 60 tests (+ 1 pgvector integration test, skipped without a DB)
 docker compose run --rm eval                 # or run it containerized
 ```
 
@@ -188,7 +188,7 @@ ragevallab/
   data.py       demo corpus + eval set + the planted hallucination
   cli.py        `python -m ragevallab.cli eval`
   api.py        optional FastAPI service (POST /query, /eval; GET /healthz)
-tests/          45 tests — pipeline behavior, the hallucination-flag guarantee,
+tests/          60 tests — pipeline behavior, the hallucination-flag guarantee,
                 the HTTP service, and a pgvector integration test (DB-gated)
 ```
 
