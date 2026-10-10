@@ -142,7 +142,7 @@ jobs:
       - name: Run the eval
         run: python -m ragevallab.cli eval --out eval_run.json
       # Dogfood: gate this repo's own evals against its main-branch baseline.
-      - uses: egnaro9/prompt-regress@main
+      - uses: egnaro9/prompt-regress@5ce45563576e06535b6ee77bd0373e379997b5da  # pinned 5ce4556, was @main
         with:
           run: eval_run.json
           suite: rag-eval-lab
