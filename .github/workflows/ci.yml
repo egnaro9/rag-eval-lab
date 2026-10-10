@@ -117,36 +117,25 @@ jobs:
             --file eval_run.json \
             --git-sha "${GITHUB_SHA:0:7}" \
             --label "$(git log -1 --pretty=%s)"
-      - name: How many runs are published?
-        run: |
-          curl -sS --max-time 30 "https://erikhill.dev/eval-history/runs.json" \
-            | python -c "import json,sys; rs=json.load(sys.stdin); rs=rs if isinstance(rs,list) else rs.get('runs',[]); rag=[r for r in rs if r.get('name')=='rag-eval-lab']; print(f'{len(rag)} rag-eval-lab runs published, newest', max((r.get('created_at','') for r in rag), default='none'))" \
-            || echo "(the archive refreshes daily; this run will appear in the next export)"
+      # Printed the newest date and asserted nothing, and ended in `|| echo`, so the step
+      # returned echo's exit status: an unreachable archive produced a reassuring sentence.
+      # Freshness is the only assertion that can notice this pipeline being green and dead
+      # at the same time, which it was for 41 days.
+      - name: The published archive must be fresh
+        run: python scripts/check_archive_freshness.py --suite rag-eval-lab
 
-  gate:
-    name: prompt-regress — PR eval gate
-    needs: test
-    # PRs only, and pull-requests:write means same-repo PRs; fork PRs lack the
-    # secret, and the action skips cleanly when the write key is empty.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - run: pip install -e .
-      - name: Run the eval
-        run: python -m ragevallab.cli eval --out eval_run.json
-      # Dogfood: gate this repo's own evals against its main-branch baseline.
-      - uses: egnaro9/prompt-regress@5ce45563576e06535b6ee77bd0373e379997b5da  # pinned 5ce4556, was @main
-        with:
-          run: eval_run.json
-          suite: rag-eval-lab
-          write-key: ${{ secrets.EVAL_HISTORY_WRITE_KEY }}
+  # The prompt-regress PR eval gate was removed on 2026-10-10. It had been unable to run
+  # since 2026-09-22 and nothing could have surfaced that: it was `if: pull_request` on a
+  # repository that gets no pull requests, so it reported `skipped` on every push while CI
+  # stayed green. Three independent breakages, not one:
+  #   1. prompt-regress 4f3acd6 made `api` a required input and this never passed it.
+  #   2. Passing it would not have helped. The only live endpoint is the static archive,
+  #      and client_for routes any /eval-history URL to ArchiveEvalHistory, whose post_run
+  #      raises by design, while gate.py calls post_run BEFORE it compares.
+  #   3. The baseline it would have compared against has been frozen since 2026-08-30.
+  # Restoring it needs somewhere to post runs, which means either a live eval-history
+  # deployment or a read-only compare path in prompt-regress. Recoverable from git history;
+  # the full diagnosis is in the commit that removed it.
 
   # The pgvector backend was shipped with `# pragma: no cover` — a real path the
   # suite never ran. This job runs it against a real pgvector-enabled Postgres,

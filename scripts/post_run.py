@@ -83,8 +83,22 @@ def write_direct(payload: dict) -> int:
     """
     url = os.environ.get("DATABASE_URL", "").strip()
     if not url:
-        print("no DATABASE_URL set \u2014 skipping (forks and PRs have no secrets)")
-        return 0
+        # This used to print "skipping (forks and PRs have no secrets)" and return 0.
+        # That named the one cause that cannot apply here: the only caller is gated to
+        # github.ref == refs/heads/main on push or dispatch, so a fork or a PR never
+        # reaches it. The real cause was that the secret did not exist, and the message
+        # explained it away for 41 days while nothing was recorded. A skip that supplies
+        # its own excuse is worse than a silent one, because the excuse stops the reader.
+        _loud("DATABASE_URL is empty, so this run was NOT recorded.")
+        print("    Nothing here can tell you why it is empty. The two causes are:\n"
+              "      - the secret is not set on this repository (Settings > Secrets and\n"
+              "        variables > Actions, DATABASE_URL), or\n"
+              "      - this context has no access to secrets, which for this job would\n"
+              "        mean the workflow guard changed, because it only runs on main.\n"
+              "    Returning nonzero so the step goes red. The job is continue-on-error,\n"
+              "    so CI stays green and the annotation still reaches the summary.",
+              file=sys.stderr)
+        return 1
     try:
         from evalhistory.app import ingest
         from evalhistory.db import make_engine
@@ -137,7 +151,10 @@ def main() -> int:
 
     key = os.environ.get("EVAL_HISTORY_WRITE_KEY", "").strip()
     if not key:
-        print("no EVAL_HISTORY_WRITE_KEY set — skipping (forks and PRs have no secrets)")
+        # Still a skip: this path genuinely does run where secrets are absent. Only the
+        # cause claim is gone, because an empty variable does not say why it is empty.
+        print("EVAL_HISTORY_WRITE_KEY is empty, so nothing was posted. Expected in a fork "
+              "or a PR, which have no secrets; otherwise the secret is not set.")
         return 0
 
     for attempt in range(1, ATTEMPTS + 1):
