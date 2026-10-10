@@ -122,6 +122,13 @@ jobs:
       # Freshness is the only assertion that can notice this pipeline being green and dead
       # at the same time, which it was for 41 days.
       - name: The published archive must be fresh
+        # !cancelled(), not always(), and not nothing. On its first run this step was
+        # SKIPPED, because the recording step above it had just failed and GitHub stops a
+        # job's remaining steps by default. So the one assertion added to catch a dead
+        # pipeline did not run in exactly the case it exists for, and reported `skipped`,
+        # which reads as consent. A missing DATABASE_URL is the reason the archive is
+        # stale, so these two must both speak, not one instead of the other.
+        if: ${{ !cancelled() }}
         run: python scripts/check_archive_freshness.py --suite rag-eval-lab
 
   # The prompt-regress PR eval gate was removed on 2026-10-10. It had been unable to run
