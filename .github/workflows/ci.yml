@@ -67,6 +67,7 @@ jobs:
         run: docker build -t rag-eval-lab:ci .
       - name: Run the eval inside the image
         run: |
+          set -o pipefail
           docker run --rm rag-eval-lab:ci | tee /tmp/out.txt
           grep -q "PLANTED" /tmp/out.txt || {
             echo "::error::the image ran but didn't flag the planted hallucination"; exit 1; }
